@@ -86,6 +86,7 @@ piece_values = [(1, 1, 2), (2, 2, 2), (3, 3, 2), (4, 3, 1), (5, 4, 1), (6, 4, 1)
 
 red_pieces = [get_piece(Piece(piece_values[i][0], piece_values[i][1], piece_values[i][2], shape, 1)) for i, shape in enumerate(piece_shapes)]
 black_pieces = [get_piece(Piece(piece_values[i][0], piece_values[i][1], piece_values[i][2], shape, -1)) for i, shape in enumerate(piece_shapes)]
+cathedral = get_piece(Piece('c', 0, 1, cathedral_shape, 1))
 
 
 
