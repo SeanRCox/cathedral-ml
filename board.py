@@ -204,7 +204,7 @@ class Board:
             formatted_row = ' '.join(f'{str(item):>3}' for item in row)
             print(formatted_row)
 
-    def check_if_any_legal_moves(self, player, piece_counts):
+    def check_if_any_legal_moves(self, player, piece_counts, has_cathedral):
         """
         Finds if there are any legal moves for the given player
 
@@ -214,13 +214,15 @@ class Board:
         """
 
         legal_moves = []
-        for piece_number in range(1, len(p.piece_names)):
+        for piece_number in range(1, 11):
+            if has_cathedral: # If the player has the cathedral, they can re-place it down (this will almost never happen)
+                legal_moves.append(self.find_potential_moves_for_given_piece('c', player))
             if piece_counts[piece_number-1] > 0:  # Check to see if the player has one of those pieces to place
                 legal_move = self.find_potential_moves_for_given_piece(piece_number, player)
                 if legal_move: return True
         return False
     
-    def find_all_legal_moves(self, player, piece_counts):
+    def find_all_legal_moves(self, player, piece_counts, has_cathedral):
         """
         Creates a list of all legal moves for the given player
 
@@ -231,9 +233,10 @@ class Board:
         """
 
         legal_moves = []
-        for piece_number in range(1, len(p.piece_names)):
+        for piece_number in range(1, 11):
+            if has_cathedral: # If the player has the cathedral, they can re-place it down (this will almost never happen)
+                legal_moves.append(self.find_potential_moves_for_given_piece('c', player))
             if piece_counts[piece_number-1] > 0:  # Check to see if the player has one of those pieces to place
-                #print("Appending Potential Moves for Piece #: " + str(piece_number))
                 legal_move = self.find_potential_moves_for_given_piece(piece_number, player)
                 if legal_move: legal_moves.append(legal_move)
 
@@ -302,7 +305,18 @@ class Board:
         return valid_placements
 
 class Player:
+    """
+    Handles each player (red/black)
+    """
     def __init__(self, player_num):
+        """
+        param player_num : 1 or 2
+
+        pieces : gets all player pieces
+        score : the player score (lower score is better)
+        has_cathedral : T/F, if player has cathedral or not
+        
+        """
         self.pieces = p.red_pieces if player_num == 1 else p.black_pieces
         self.score = 47  # Starting score is sum of all pieces, goal is to place all pieces or get lowest score before game ends
         self.has_cathedral = True if player_num == 1 else False
@@ -335,6 +349,9 @@ class Player:
             self.has_cathedral = True
         else:
             self.pieces[int(piece)-1][1] += 1
+
+    def can_place_cathedral(self):
+        return self.has_cathedral
 
     
 

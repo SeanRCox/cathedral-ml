@@ -1,5 +1,4 @@
 from board import Board, Player
-from pieces import piece_names
 import random
 
 class Game:
@@ -27,7 +26,10 @@ class Game:
         
         piece_count = self.red_player.get_piece_counts()  # We need to know the piece count to know if moves are valid, start with p1's count
         while not self.game_over():
-            if self.game_board.check_if_any_legal_moves(turn, piece_count):  # Check if there are any legal moves for the current player
+            has_cathedral = False  # assume player does not have cathedral
+            if turn == 1:  # If its player 1's turn and they have the cathedral (only p1 can have the cathedral)
+                has_cathedral = self.red_player.can_place_cathedral()
+            if self.game_board.check_if_any_legal_moves(turn, piece_count, has_cathedral):  # Check if there are any legal moves for the current player
                 potential_pieces = []
                 for n in range(0, 10): # 11 possible pieces
                     if piece_count[n] > 0:  # If player has that piece
@@ -66,15 +68,11 @@ class Game:
         """
 
         # Check if either player has legal moves
-        red_has_moves = self.game_board.check_if_any_legal_moves(1, self.red_player.get_piece_counts()) 
-        #print("Red Possible Moves:" + str(len(self.game_board.find_all_legal_moves(1, self.red_player.get_piece_counts()))))
-        #print((self.game_board.find_all_legal_moves(1, self.red_player.get_piece_counts())))
-        black_has_moves = self.game_board.check_if_any_legal_moves(2, self.black_player.get_piece_counts())
-        #print("Black Possible Moves:" + str(len(self.game_board.find_all_legal_moves(1, self.black_player.get_piece_counts()))))
-        #print((self.game_board.find_all_legal_moves(1, self.black_player.get_piece_counts())))
+        red_has_moves = self.game_board.check_if_any_legal_moves(1, self.red_player.get_piece_counts(), self.red_player.can_place_cathedral()) 
+        black_has_moves = self.game_board.check_if_any_legal_moves(2, self.black_player.get_piece_counts(), False)
+
         # If both players have no legal moves, game is over
         if not red_has_moves and not black_has_moves:
-            #print(f"Red Score: {self.red_player.score}, Black Score: {self.black_player.score}")
             if self.red_player.score < self.black_player.score:
                 print("Red Wins")
                 return True
