@@ -214,7 +214,7 @@ class Board:
         """
 
         legal_moves = []
-        for piece_number in range(1, 11):
+        for piece_number in range(1, 12):
             if has_cathedral: # If the player has the cathedral, they can re-place it down (this will almost never happen)
                 legal_moves.append(self.find_potential_moves_for_given_piece('c', player))
             if piece_counts[piece_number-1] > 0:  # Check to see if the player has one of those pieces to place
@@ -222,7 +222,7 @@ class Board:
                 if legal_move: return True
         return False
     
-    def find_all_legal_moves(self, player, piece_counts, has_cathedral):
+    def find_all_legal_moves(self, player, piece_counts, has_cathedral, first_turn=None):
         """
         Creates a list of all legal moves for the given player
 
@@ -233,12 +233,20 @@ class Board:
         """
 
         legal_moves = []
-        for piece_number in range(1, 11):
-            if has_cathedral: # If the player has the cathedral, they can re-place it down (this will almost never happen)
-                legal_moves.append(self.find_potential_moves_for_given_piece('c', player))
-            if piece_counts[piece_number-1] > 0:  # Check to see if the player has one of those pieces to place
-                legal_move = self.find_potential_moves_for_given_piece(piece_number, player)
-                if legal_move: legal_moves.append(legal_move)
+        if first_turn:
+            legal_move = self.find_potential_moves_for_given_piece('c', player)
+            for move in legal_move:
+                legal_moves.append(('c', move))
+        else:
+            for piece_number in range(1, 12):
+                if has_cathedral: # If the player has the cathedral, they can re-place it down (this will almost never happen)
+                    legal_move = self.find_potential_moves_for_given_piece('c', player)
+                    for move in legal_move:
+                        legal_moves.append(('c', move))
+                if piece_counts[piece_number-1] > 0:  # Check to see if the player has one of those pieces to place
+                    legal_move = self.find_potential_moves_for_given_piece(piece_number, player)
+                    for move in legal_move:
+                        legal_moves.append((piece_number, move))
 
         return legal_moves
 
@@ -247,7 +255,7 @@ class Board:
         Creates a list of all potential moves for each piece (considering all shapes)
 
         param player : the player number (1 or 2)
-        param piece_number : the piece number (1-10)
+        param piece_number : the piece number (1-11)
         
         return : all potential moves for a given piece
         """
@@ -317,6 +325,7 @@ class Player:
         has_cathedral : T/F, if player has cathedral or not
         
         """
+        self.player_num = player_num
         self.pieces = p.red_pieces if player_num == 1 else p.black_pieces
         self.score = 47  # Starting score is sum of all pieces, goal is to place all pieces or get lowest score before game ends
         self.has_cathedral = True if player_num == 1 else False
@@ -348,6 +357,7 @@ class Player:
         if piece == 'c':
             self.has_cathedral = True
         else:
+            piece = abs(piece)
             self.pieces[int(piece)-1][1] += 1
 
     def can_place_cathedral(self):
