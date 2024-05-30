@@ -3,164 +3,255 @@ import copy
 import numpy as np
 from game import Game
 
+results_file = 'results/sim_results.txt'
+
 class MCTS_Node:
-    def __init__(self, game, turn, first_move=None, parent=None, parent_move=None):
+    def __init__(self, game, turn, level, parent=None):
         """
         Initializes a node for the Monte Carlo Tree
         
-        game_board : the current state of the game board (10x10 np array)
-        parent : the parent node to the current node (None for the root)
-        parent_move : the move that parent took to reach this node (none for the root)
-        children : all children of the current node
-        num_visits : the number of times this node has been visited
+        _game : game class, manages game board and players
+        _turn : tracks the current turn, 1 for red, 2 for black
+        _next_turn : opposite of turn
+        _first_move : optional arg used to track if this node corresponds to the first move,
+        this is necessary to becuase red goes twice to start
+
+        _parent : the parent node, none for root
+        _children : list of all child nodes
+        _num_visits : the amount of times this node was visited
+
+        results: track the wins for this node (1 for red, -1 for black, 0 for tie)
         """
 
-        self.game = game  # Use this to access game board, players and turn
-        self.turn = turn # 1 for red 2 for black
-        self.next_turn = 1 if self.turn == 2 or first_move == True else 2
-        self.first_move = first_move  # Player 1 goes twice to start, need a way to track if its the first move 
-        self.current_player = game.red_player if self.turn == 1 else game.black_player
-        self.opposing_player = game.red_player if self.turn == 2 else game.black_player
+        self._game = game  # Use this to access game board, players
+        self._turn = turn # 1 for red 2 for black
+        self._level = level
+        self._next_turn = 1 if self._turn == 2 or self._level < 2 else 2 
 
-        self.parent = parent
-        self.parent_move = parent_move
-        self.children = []
-        self.num_visits = 0
+        self._parent = parent  # Parent node
+        self._children = []  # List of child nodes
+        self._num_visits = 0  # number of times this node has been visited
 
-        self.results = {}
-        self.results[1] = 0  # Wins
-        self.results[-1] = 0  # Losses
-        self.results[0] = 0  # Ties
+        self._results = {}  # Results dictionary
+        self._results[1] = 0  # Red Wins
+        self._results[-1] = 0  # Black Wins
+        self._results[0] = 0  # Ties
 
-        if self.parent == None:
-            self._untried_moves = self.game.game_board.find_all_legal_moves \
-                               (1, self.current_player.get_piece_counts(), self.current_player.can_place_cathedral(), True)
-            self.game.red_player.use_piece('c')
+        if self._parent == None:  
+            # If this is the root node, red player's first move must be to place cathedral
+            self._untried_moves = self._game.game_board.find_all_legal_moves \
+                               (1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral(), True)
+
         else:
-            self._untried_moves = self.game.game_board.find_all_legal_moves \
-                               (self.next_turn, self.opposing_player.get_piece_counts(), self.opposing_player.can_place_cathedral())
-        
 
-    def expand(self):
+            if self._turn == 1 or \
+            not self._game.game_board.check_if_any_legal_moves(1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral()):
+
+                self._untried_moves = self._game.game_board.find_all_legal_moves \
+                    (self._next_turn, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral())
+            
+            elif self._turn == 2 or \
+            not self._game.game_board.check_if_any_legal_moves(2, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral()):
+
+                self._untried_moves = self._game.game_board.find_all_legal_moves \
+                    (self._next_turn, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral())
+                
+        self._untried_moves = self._randomize_potential_moves(self._untried_moves)  # Randomize the potential moves 
+        
+    def _expand(self):
         """
         Expand the tree from the current node
-        """
-        print(f"Untried Moves: {len(self._untried_moves)}")
-        move = self._untried_moves.pop()
-        
-        updated_game = copy.deepcopy(self.game)
-        updated_game.game_board.update(move[1], self.turn, move[0])
 
-        child_node = MCTS_Node(updated_game, self.next_turn, parent=self, parent_move=move)
-        self.children.append(child_node)
-        #print(child_node.game.game_board.print_board())
-        #print("_"*40)
+        return : a new child node with the updated board/player state after playing an untried move
+        """
+
+        print(f"Current Move, Next Move: ({self._turn}, {self._next_turn})")
+
+        print(f"Potential Moves to Explore: {len(self._untried_moves)}")
+        move = self._untried_moves.pop()  # Pop an untried move
+        print(f"Making Node for Move: {move}")
+        
+        updated_game = copy.deepcopy(self._game)  # Make a deepcopy of the current game, this is the game for the new node
+        updated_game.game_board.update(move[1], self._next_turn, move[0])  # Update the new game, this is the initial game for the new node
+
+        # Update the piece counts for the correct player
+        piece_selected = move[0] 
+        if self._next_turn == 1:
+            updated_game.red_player.use_piece(piece_selected)
+        else: 
+            updated_game.black_player.use_piece(piece_selected)
+
+        # Create a new child node with the updated board/player states
+        child_node = MCTS_Node(updated_game, self._next_turn, self._level+1, parent=self)
+        self._children.append(child_node)
+        
         return child_node
     
-    def rollout(self, from_root=None):
+    def _rollout(self):
         """
         Simulate the rest of the game from the current position
         """
-        simulated_game = copy.deepcopy(self.game)
-        current_turn = self.turn
 
-        """
-        if node_level == 0:
-            potential_moves = simulated_game.game_board.find_potential_moves_for_given_piece('c', 1)  # Player 1 places the cathedral
-            move_selected = self.rollout_policy(potential_moves)
-            simulated_game.red_player.use_piece('c')
-            simulated_game.game_board.update(move_selected, 1, 'c')  #Put the cathedral on the board 
-            print(move_selected)
-        """
+        simulated_game = copy.deepcopy(self._game)  # Make a deepycopy of the current game state to simulate from
+        current_turn = self._turn
+        current_level = self._level
         
-        while not simulated_game.game_over():
+        while not simulated_game.game_over(): 
+            # While the game is not over
 
-            current_turn = 1 if current_turn == 2 else 2
-            if from_root:
-                current_turn = 1
-                from_root = False
-
+            # Flip between Players
+            current_turn = 1 if current_turn == 2 or current_level < 2 else 2 
             current_player = simulated_game.red_player if current_turn == 1 else simulated_game.black_player
-            #print(f"Current Player: {current_turn}, can play cathedral?: {current_player.can_place_cathedral()}")
 
+            # Get potential moves for the current player
             potential_moves = simulated_game.game_board.find_all_legal_moves \
                                 (current_turn, current_player.get_piece_counts(), current_player.can_place_cathedral())
 
-
+            # If the current player can make a move, if not flip to the other player/end the game
             if potential_moves: 
-                move_selected = self.rollout_policy(potential_moves)
+                move_selected = self._rollout_policy(potential_moves)  # Select a move based on rollout policy (right now just pick a random move)
 
-                piece_selected = move_selected[0]
+                # Remove the piece from the players piece count
+                piece_selected = move_selected[0] 
                 if current_turn == 1:
                     simulated_game.red_player.use_piece(piece_selected)
                 else: 
                     simulated_game.black_player.use_piece(piece_selected)
 
+                # Update the board
                 returned_pieces = simulated_game.game_board.update(move_selected[1], current_turn, move_selected[0])
                 if returned_pieces:  # If any pieces were captured, return them to the opposing player
                     if current_turn == 1: simulated_game.black_player.return_pieces(returned_pieces[0])
                     else: simulated_game.red_player.return_pieces(returned_pieces[0])
-            
-        return simulated_game.winner
+        
+            # Go to the next 'level' (next order of potential moves)
+            current_level+=1
 
-    def rollout_policy(self, potential_moves):
+        return simulated_game.winner  # Once a winner is found, end simulation
+
+    def _rollout_policy(self, potential_moves):
         """
-        The policy for selecting which moves to simulate. For now it is just random
+        The policy for selecting which moves to simulate 
+        for now it is just picking a random move
+
+        potential_moves : list of potential moves to pick from
         """
+
         return random.choice(potential_moves)
 
-    def backpropagate(self, result):
-        self.num_visits += 1
-        self.results[result] += 1
-        if self.parent:
-            self.parent.backpropagate(result)
+    def _backpropagate(self, result):
+        """
+        Backpropgate the result up the tree
 
-    def is_fully_expanded(self):
+        result : the result of the simulated node (1 for red win, -1 for black win, 0 for tie)
+        """
+
+        self._num_visits += 1
+        self._results[result] += 1
+        if self._parent:
+            self._parent._backpropagate(result)  # Backprop
+
+    def _is_fully_expanded(self):
+        """
+        Determines if the tree is fully expanded (no potential moves from current node)
+        """
+
         return len(self._untried_moves) == 0
 
-    def best_child(self, c_param=0.1):
-        choices_weights = [(c.q() / c.n()) + c_param * np.sqrt((2 * np.log(self.n()) / c.n())) for c in self.children]
-        return self.children[np.argmax(choices_weights)]
+    def best_child(self, C):
+        """
+        Use Upper Confidence Bound formula for selecting the most optimal node
+
+        C : the 'c' hyperparamter, set to bias exploration vs exploitation,
+        or going to new nodes vs going to nodes already known to be strong
+        """
+
+        choices_weights = [(child._get_num_wins() / child._get_num_visits()) + C * \
+                           np.sqrt((2 * np.log(self._get_num_visits()) / child._get_num_visits())) for child in self._children]
+        
+        return self._children[np.argmax(choices_weights)]  # Return the strongest node
 
     def _tree_policy(self):
+        """
+        Determines the policy for expanding the tree
+        If the current node is not an end node, and the tree is not fully expanded
+        from the current node, expand the tree from the current node. Otherwise just
+        return the best child node
+        """
+
         current_node = self
-        while not current_node.is_terminal_node():
+        while not current_node._is_terminal_node():
     
-            if not current_node.is_fully_expanded():
-                return current_node.expand()
+            if not current_node._is_fully_expanded():
+                return current_node._expand()
             else:
                 current_node = current_node.best_child()
         
         return current_node
 
-    def is_terminal_node(self):
-        return self.game.game_over()
+    def _is_terminal_node(self):
+        """
+        Check if the game is over
+        """
 
-    def best_action(self, from_root=None):
-        simulation_no = 100
-        
-        for _ in range(simulation_no):
-            v = self._tree_policy()
-            reward = v.rollout(from_root)
-            v.backpropagate(reward)
-        
-        return self.best_child(c_param=0.1)
+        return self._game.game_over()
+
+    def _get_num_wins(self):
+        """
+        Determine the win-loss ratio of simulated games from current node and all child nodes
+        Different for each player
+
+        THIS FUNCTION NEEDS UPDATING
+        """
+
+        red_wins = self._results[1]
+        black_wins = self._results[-1]
+        if self._turn == 1: 
+            return red_wins-black_wins 
+        elif self._turn == 2:
+            return black_wins-red_wins
     
-    def q(self):
-        wins = self.results[1]
-        loses = self.results[-1]
-        return wins - loses
+    def _get_num_visits(self):
+        """
+        returns the number of times the current node has been visited
+        """
+
+        return self._num_visits
+
+    def _randomize_potential_moves(self, potential_moves):
+        """
+        helper function to randomize the list of potential moves
+        this is useful when there are too many potential moves,
+        but you want a more representaive sample of the possible
+        moves rather then just the potential moves of a few pieces
+        """
+
+        random.shuffle(potential_moves)
+        return potential_moves
     
-    def n(self):
-        return self.num_visits
+    def best_action(self):
+        """
+        Find the best action from the current node
+        """
+
+        num_of_expansions = len(self._untried_moves)  # Amount of nodes to expand/sim
+        
+        for _ in range(num_of_expansions):
+            node = self._tree_policy()  # Either a new node or the best child
+            reward = node._rollout()  # Simulate a game from this node
+            node._backpropagate(reward)  # Backprop results of sim
+
+        f = open(results_file, "a")
+        f.write(f"Node score at level {self._level}: {self._results} \n")
+        f.close
+        
+        return self.best_child(C=0.1)   
+
 
 cathedral = Game()
-root = MCTS_Node(cathedral, 1, first_move=True)
-selected_node = root.best_action(from_root=True)
-next_node = selected_node.best_action()
-for child in selected_node.children:
-    child.game.game_board.print_board()
-    print("_"*40)
-print(selected_node.results)
-print("Best Move:")
-next_node.game.game_board.print_board()
+root = MCTS_Node(cathedral, 1, 0)
+selected_node = root.best_action()
+for i in range(0,8):
+    selected_node = selected_node.best_action()
+    print(f"Best Move: at level {i}")
+    selected_node._game.game_board.print_board()

@@ -14,6 +14,7 @@ class Piece:
 
         rotations: all of the possible rotations for that piece (between 1 and 4)
         """
+        
         self._point_value = p_value
         self._piece_shape = np.where(p_shape == 1, p_num*player, p_shape)
         self._initial_count = p_count
@@ -45,18 +46,21 @@ class Piece:
         """ 
         Rotate the matrix clockwise 90 degrees. 
         """
+
         return np.array([list(reversed(col)) for col in zip(*self._piece_shape)])
     
     def _rotate_180(self):
         """ 
         Rotate the matrix 180 degrees. 
         """
+
         return np.array([list(reversed(row)) for row in reversed(self._piece_shape)])
 
     def _rotate_counterclockwise(self):
         """ 
         Rotate the matrix counterclockwise 90 degrees. 
         """
+
         return np.array([list(col) for col in reversed(list(zip(*self._piece_shape)))])
     
     def get_piece(self):

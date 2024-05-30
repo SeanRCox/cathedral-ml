@@ -318,25 +318,33 @@ class Player:
     """
     def __init__(self, player_num):
         """
-        param player_num : 1 or 2
-
+        player_num :
         pieces : gets all player pieces
         score : the player score (lower score is better)
         has_cathedral : T/F, if player has cathedral or not
-        
         """
+
         self.player_num = player_num
         self.pieces = p.red_pieces if player_num == 1 else p.black_pieces
         self.score = 47  # Starting score is sum of all pieces, goal is to place all pieces or get lowest score before game ends
         self.has_cathedral = True if player_num == 1 else False
     
     def use_piece(self, piece):
+        """
+        Remove a piece from a players piece count, update their score
+
+        piece : piece to remove
+        """
+
+        # If piece is the cathedral, set cathedral boolean to false
         if piece == 'c':
             self.has_cathedral = False
             return True
         
-        if self.pieces[int(piece)-1][1] < 1: return False
-        
+        # If player cannot use piece, return false
+        if self.pieces[int(piece)-1][1] < 1: return False  
+
+        # Decrement and update piece count and score
         self.pieces[int(piece)-1][1] -= 1
         self.score -= self.pieces[int(piece)-1][0]
         
@@ -344,8 +352,9 @@ class Player:
     
     def get_piece_counts(self):
         """
-        
+        Returns a list of the current players piece count
         """
+
         counts = []
         for piece in self.pieces:
             counts.append(piece[1])
@@ -353,7 +362,12 @@ class Player:
         return counts
     
     def return_pieces(self, piece):
-        #NEED TO ACCOUNT FOR CASE WHERE CATHEDRAL IS RETURNED SO IT CAN BE RE-PLACED
+        """
+        Increments a players piece count if a piece is captured by the other player
+
+        piece : the piece to be returned
+        """
+
         if piece == 'c':
             self.has_cathedral = True
         else:
@@ -361,6 +375,10 @@ class Player:
             self.pieces[int(piece)-1][1] += 1
 
     def can_place_cathedral(self):
+        """
+        Returns whether or not the current player can place the cathedral
+        """
+
         return self.has_cathedral
 
     
