@@ -26,6 +26,7 @@ class Game:
         # Check if either player has legal moves
         red_has_moves = self.game_board.check_if_any_legal_moves(1, self.red_player.get_piece_counts(), self.red_player.can_place_cathedral()) 
         black_has_moves = self.game_board.check_if_any_legal_moves(2, self.black_player.get_piece_counts(), False)
+        #print(f"Legal Moves: {self.game_board.find_all_legal_moves(1, self.red_player.get_piece_counts(), self.red_player.can_place_cathedral)}")
 
         # If both players have no legal moves, game is over
         if not red_has_moves and not black_has_moves:
@@ -36,6 +37,7 @@ class Game:
             else:  
                 self.winner = 0
             
+            #print("Game is Over")
             return True
 
         # Check if either player has 0 score (played all their pieces)

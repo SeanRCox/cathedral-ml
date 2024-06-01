@@ -28,6 +28,12 @@ class MCTS_Node:
         self._level = level
         self._next_turn = 1 if self._turn == 2 or self._level < 2 else 2 
 
+        if not self._game.game_board.check_if_any_legal_moves(1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral()):
+            self._next_turn = 2
+
+        if not self._game.game_board.check_if_any_legal_moves(2, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral()):
+            self._next_turn = 1
+
         self._parent = parent  # Parent node
         self._children = []  # List of child nodes
         self._num_visits = 0  # number of times this node has been visited
@@ -44,17 +50,13 @@ class MCTS_Node:
 
         else:
 
-            if self._turn == 1 or \
-            not self._game.game_board.check_if_any_legal_moves(1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral()):
-
+            if self._next_turn == 2:
                 self._untried_moves = self._game.game_board.find_all_legal_moves \
-                    (self._next_turn, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral())
+                    (2, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral())
             
-            elif self._turn == 2 or \
-            not self._game.game_board.check_if_any_legal_moves(2, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral()):
-
+            if self._next_turn == 1:
                 self._untried_moves = self._game.game_board.find_all_legal_moves \
-                    (self._next_turn, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral())
+                    (1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral())
                 
         self._untried_moves = self._randomize_potential_moves(self._untried_moves)  # Randomize the potential moves 
         
@@ -65,14 +67,16 @@ class MCTS_Node:
         return : a new child node with the updated board/player state after playing an untried move
         """
 
-        print(f"Current Move, Next Move: ({self._turn}, {self._next_turn})")
-
         print(f"Potential Moves to Explore: {len(self._untried_moves)}")
         move = self._untried_moves.pop()  # Pop an untried move
-        print(f"Making Node for Move: {move}")
         
         updated_game = copy.deepcopy(self._game)  # Make a deepcopy of the current game, this is the game for the new node
-        updated_game.game_board.update(move[1], self._next_turn, move[0])  # Update the new game, this is the initial game for the new node
+        returned_pieces = updated_game.game_board.update(move[1], self._next_turn, move[0])  # Update the new game, this is the initial game for the new node
+        if returned_pieces: 
+            if self._next_turn == 1: 
+                updated_game.black_player.return_pieces(returned_pieces[0])
+            elif self._next_turn == 2: 
+                updated_game.red_player.return_pieces(returned_pieces[0])
 
         # Update the piece counts for the correct player
         piece_selected = move[0] 
@@ -168,10 +172,9 @@ class MCTS_Node:
 
         choices_weights = [(child._get_num_wins() / child._get_num_visits()) + C * \
                            np.sqrt((2 * np.log(self._get_num_visits()) / child._get_num_visits())) for child in self._children]
-        
         return self._children[np.argmax(choices_weights)]  # Return the strongest node
 
-    def _tree_policy(self):
+    def _tree_policy(self, C):
         """
         Determines the policy for expanding the tree
         If the current node is not an end node, and the tree is not fully expanded
@@ -185,7 +188,7 @@ class MCTS_Node:
             if not current_node._is_fully_expanded():
                 return current_node._expand()
             else:
-                current_node = current_node.best_child()
+                current_node = current_node.best_child(C)
         
         return current_node
 
@@ -193,15 +196,12 @@ class MCTS_Node:
         """
         Check if the game is over
         """
-
         return self._game.game_over()
 
     def _get_num_wins(self):
         """
         Determine the win-loss ratio of simulated games from current node and all child nodes
         Different for each player
-
-        THIS FUNCTION NEEDS UPDATING
         """
 
         red_wins = self._results[1]
@@ -229,29 +229,44 @@ class MCTS_Node:
         random.shuffle(potential_moves)
         return potential_moves
     
-    def best_action(self):
+    def best_action(self, num_games, C):
         """
         Find the best action from the current node
         """
 
-        num_of_expansions = len(self._untried_moves)  # Amount of nodes to expand/sim
-        
-        for _ in range(num_of_expansions):
-            node = self._tree_policy()  # Either a new node or the best child
+        num_of_expansions = num_games  # Amount of nodes to expand/sim
+
+        for i in range(num_of_expansions):
+            print(f"Simulation #: {i}")
+            node = self._tree_policy(C)  # Either a new node or the best child
+            #print(f"Node Depth: {node._level}")
             reward = node._rollout()  # Simulate a game from this node
             node._backpropagate(reward)  # Backprop results of sim
+    
+        return self.best_child(C)   
+    
+    def find_node(self, game_state):
+        for child in self._children:
+            if child._game == game_state:
+                return child
+        return False
+    
+    def expand_specific_node(self, game_state):
+        """
+        Used when a game is being played and the tree does
+        not contain a child node for the opponents selected move
+        """
+        new_node = MCTS_Node(game_state, self._next_turn, self._level+1, parent=self)
+        self._children.append(new_node)
+        return new_node
 
-        f = open(results_file, "a")
-        f.write(f"Node score at level {self._level}: {self._results} \n")
-        f.close
-        
-        return self.best_child(C=0.1)   
+    def get_weights(self, C):
+        """
+        Return the weights at the current node. Used for logging purposes
+        """
 
-
-cathedral = Game()
-root = MCTS_Node(cathedral, 1, 0)
-selected_node = root.best_action()
-for i in range(0,8):
-    selected_node = selected_node.best_action()
-    print(f"Best Move: at level {i}")
-    selected_node._game.game_board.print_board()
+        choices_weights = [(child._get_num_wins() / child._get_num_visits()) + C * \
+                        np.sqrt((2 * np.log(self._get_num_visits()) / child._get_num_visits())) for child in self._children]
+        return choices_weights
+    
+    

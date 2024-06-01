@@ -311,6 +311,18 @@ class Board:
             if valid: valid_placements.append(coordinates_to_update)  # If all of the squares are valid, add it to the list of valid placements
 
         return valid_placements
+    
+    def get_potential_moves(self, player, first_turn=None):
+        """
+        find all potential moves for a player
+        """
+        return self.find_all_legal_moves(player.player_num, player.get_piece_counts(), player.can_place_cathedral(), first_turn)
+
+    def has_potential_moves(self, player, first_turn=None):
+        """
+        find if any potential moves for a player
+        """
+        return self.check_if_any_legal_moves(player.player_num, player.get_piece_counts(), player.can_place_cathedral(), first_turn)
 
 class Player:
     """
