@@ -32,6 +32,8 @@ class Board:
         self._p1_controlled = 0
         self._p2_controlled = 0 
 
+        self.total_placed_pieces = 0
+
     def _refresh_board_state(self, placed_piece, player_sign):
         """
         Used after every player turn to update the board state
@@ -128,18 +130,20 @@ class Board:
             if len(piece_type_seen) > 1:
                 return False  # Only 1 piece can be surrounded and captured. If there is more then 1 type of piece in an area, the area is uncapturable.
 
+            """
             opponent_control_count = self._p2_controlled if player_sign == 1 else self._p1_controlled  # number of squares controlled by opponent (unreachable)
             if len(visited) > self._total_squares/2 - opponent_control_count: 
                 # If an area is able to be reached by half the reachable board, it cannot be captured
                 # This logic ensures only small areas can be captured
                 return False
+            """
             
             for sq in self._get_adjacent_squares(x,y): # Check every adjacent square to the given square
                 nx, ny = sq[0], sq[1]
                 
-                if (self._board[nx, ny] == 'b') or (self._board[nx, ny] == 'r'): 
-                    # If the square is already controlled by a player, dont have to check
-                    continue 
+                controlled_squares = 'r' if player_sign == 1 else 'b'
+                if (self._board[nx, ny] == controlled_squares): 
+                    queue.append((nx, ny))
 
                 elif (self._board[nx, ny] == 'c'): 
                     # Special case where the cathedral is seen: This can be captured
@@ -169,6 +173,7 @@ class Board:
 
         return : any pieces that have been captured
         """
+        self.total_placed_pieces += 1
         player_sign = 1 if player == 1 else -1
         if self._check_if_legal_move(target_squares, player):
             for target in target_squares:
@@ -176,6 +181,8 @@ class Board:
                     self._board[target[0], target[1]] = 'c'
                 else:
                     self._board[target[0], target[1]] = int(piece_num) * player_sign  # Update the target squares with the proper piece number
+            if self.total_placed_pieces <= 3:  # Squares can only be captured after each players first turn
+                return False
             return self._refresh_board_state(target_squares, player_sign)  # If any pieces are captured, return them to the player
 
     def _check_if_legal_move(self, target_squares, player):
@@ -311,18 +318,6 @@ class Board:
             if valid: valid_placements.append(coordinates_to_update)  # If all of the squares are valid, add it to the list of valid placements
 
         return valid_placements
-    
-    def get_potential_moves(self, player, first_turn=None):
-        """
-        find all potential moves for a player
-        """
-        return self.find_all_legal_moves(player.player_num, player.get_piece_counts(), player.can_place_cathedral(), first_turn)
-
-    def has_potential_moves(self, player, first_turn=None):
-        """
-        find if any potential moves for a player
-        """
-        return self.check_if_any_legal_moves(player.player_num, player.get_piece_counts(), player.can_place_cathedral(), first_turn)
 
 class Player:
     """

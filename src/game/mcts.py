@@ -24,14 +24,16 @@ class MCTS_Node:
         """
 
         self._game = game  # Use this to access game board, players
+        self._red = game.red_player
+        self._black = game.black_player
         self._turn = turn # 1 for red 2 for black
         self._level = level
         self._next_turn = 1 if self._turn == 2 or self._level < 2 else 2 
 
-        if not self._game.game_board.check_if_any_legal_moves(1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral()):
+        if not self._game.has_potential_moves(self._red):
             self._next_turn = 2
 
-        if not self._game.game_board.check_if_any_legal_moves(2, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral()):
+        if not self._game.has_potential_moves(self._black):
             self._next_turn = 1
 
         self._parent = parent  # Parent node
@@ -45,18 +47,14 @@ class MCTS_Node:
 
         if self._parent == None:  
             # If this is the root node, red player's first move must be to place cathedral
-            self._untried_moves = self._game.game_board.find_all_legal_moves \
-                               (1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral(), True)
+            self._untried_moves = self._game.get_potential_moves(self._red, True)
 
         else:
-
             if self._next_turn == 2:
-                self._untried_moves = self._game.game_board.find_all_legal_moves \
-                    (2, self._game.black_player.get_piece_counts(), self._game.black_player.can_place_cathedral())
+                self._untried_moves = self._game.get_potential_moves(self._black)
             
             if self._next_turn == 1:
-                self._untried_moves = self._game.game_board.find_all_legal_moves \
-                    (1, self._game.red_player.get_piece_counts(), self._game.red_player.can_place_cathedral())
+                self._untried_moves = self._game.get_potential_moves(self._red)
                 
         self._untried_moves = self._randomize_potential_moves(self._untried_moves)  # Randomize the potential moves 
         
@@ -67,7 +65,7 @@ class MCTS_Node:
         return : a new child node with the updated board/player state after playing an untried move
         """
 
-        print(f"Potential Moves to Explore: {len(self._untried_moves)}")
+        #print(f"Potential Moves to Explore: {len(self._untried_moves)}")
         move = self._untried_moves.pop()  # Pop an untried move
         
         updated_game = copy.deepcopy(self._game)  # Make a deepcopy of the current game, this is the game for the new node
@@ -108,8 +106,7 @@ class MCTS_Node:
             current_player = simulated_game.red_player if current_turn == 1 else simulated_game.black_player
 
             # Get potential moves for the current player
-            potential_moves = simulated_game.game_board.find_all_legal_moves \
-                                (current_turn, current_player.get_piece_counts(), current_player.can_place_cathedral())
+            potential_moves = simulated_game.get_potential_moves(current_player)
 
             # If the current player can make a move, if not flip to the other player/end the game
             if potential_moves: 
@@ -237,9 +234,8 @@ class MCTS_Node:
         num_of_expansions = num_games  # Amount of nodes to expand/sim
 
         for i in range(num_of_expansions):
-            print(f"Simulation #: {i}")
+            #print(f"Simulation #: {i}")
             node = self._tree_policy(C)  # Either a new node or the best child
-            #print(f"Node Depth: {node._level}")
             reward = node._rollout()  # Simulate a game from this node
             node._backpropagate(reward)  # Backprop results of sim
     
@@ -259,14 +255,5 @@ class MCTS_Node:
         new_node = MCTS_Node(game_state, self._next_turn, self._level+1, parent=self)
         self._children.append(new_node)
         return new_node
-
-    def get_weights(self, C):
-        """
-        Return the weights at the current node. Used for logging purposes
-        """
-
-        choices_weights = [(child._get_num_wins() / child._get_num_visits()) + C * \
-                        np.sqrt((2 * np.log(self._get_num_visits()) / child._get_num_visits())) for child in self._children]
-        return choices_weights
     
     

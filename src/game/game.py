@@ -50,6 +50,17 @@ class Game:
         
         return False
 
+    def get_potential_moves(self, player, first_turn=None):
+        """
+        find all potential moves for a player
+        """
+        return self.game_board.find_all_legal_moves(player.player_num, player.get_piece_counts(), player.can_place_cathedral(), first_turn)
+
+    def has_potential_moves(self, player):
+        """
+        find if any potential moves for a player
+        """
+        return self.game_board.check_if_any_legal_moves(player.player_num, player.get_piece_counts(), player.can_place_cathedral())
 
 
         
