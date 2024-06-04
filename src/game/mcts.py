@@ -1,12 +1,11 @@
 import random
 import copy
 import numpy as np
-from game import Game
 
 results_file = 'results/sim_results.txt'
 
 class MCTS_Node:
-    def __init__(self, game, turn, level, parent=None):
+    def __init__(self, game, turn, level, parent=None, modified_rules=None):
         """
         Initializes a node for the Monte Carlo Tree
         
@@ -23,16 +22,26 @@ class MCTS_Node:
         results: track the wins for this node (1 for red, -1 for black, 0 for tie)
         """
 
-        self._game = game  # Use this to access game board, players
+        self._game = game # Use this to access game board, players
         self._red = game.red_player
         self._black = game.black_player
         self._turn = turn # 1 for red 2 for black
         self._level = level
-        self._next_turn = 1 if self._turn == 2 or self._level < 2 else 2 
+        self._modified_rules = modified_rules
 
+        # Under modified rules, black player places cathedral and their first move together
+        if self._level == 0:
+            self._next_turn = 1
+        elif self._modified_rules and (self._level == 2):
+            self._next_turn = 2
+        elif not self._modified_rules and (self._level == 1):
+            self._next_turn = 1
+        else:
+            self._next_turn = 1 if self._turn == 2 else 2
+
+        # If a player does not have a move, skip their turn and go to the other player
         if not self._game.has_potential_moves(self._red):
             self._next_turn = 2
-
         if not self._game.has_potential_moves(self._black):
             self._next_turn = 1
 
@@ -45,10 +54,11 @@ class MCTS_Node:
         self._results[-1] = 0  # Black Wins
         self._results[0] = 0  # Ties
 
-        if self._parent == None:  
-            # If this is the root node, red player's first move must be to place cathedral
+        # Special checks to account for cathedral placement
+        if modified_rules and self._level == 1:
+            self._untried_moves = self._game.get_potential_moves(self._black, True)
+        elif not modified_rules and self._level == 0:
             self._untried_moves = self._game.get_potential_moves(self._red, True)
-
         else:
             if self._next_turn == 2:
                 self._untried_moves = self._game.get_potential_moves(self._black)
@@ -69,22 +79,16 @@ class MCTS_Node:
         move = self._untried_moves.pop()  # Pop an untried move
         
         updated_game = copy.deepcopy(self._game)  # Make a deepcopy of the current game, this is the game for the new node
+
+        piece_selected = move[0] 
+        updated_game.use_piece(self._next_turn, piece_selected)
+        
         returned_pieces = updated_game.game_board.update(move[1], self._next_turn, move[0])  # Update the new game, this is the initial game for the new node
         if returned_pieces: 
-            if self._next_turn == 1: 
-                updated_game.black_player.return_pieces(returned_pieces[0])
-            elif self._next_turn == 2: 
-                updated_game.red_player.return_pieces(returned_pieces[0])
-
-        # Update the piece counts for the correct player
-        piece_selected = move[0] 
-        if self._next_turn == 1:
-            updated_game.red_player.use_piece(piece_selected)
-        else: 
-            updated_game.black_player.use_piece(piece_selected)
+            updated_game.return_piece(self._next_turn, returned_pieces[0])
 
         # Create a new child node with the updated board/player states
-        child_node = MCTS_Node(updated_game, self._next_turn, self._level+1, parent=self)
+        child_node = MCTS_Node(updated_game, self._next_turn, self._level+1, parent=self, modified_rules=self._modified_rules)
         self._children.append(child_node)
         
         return child_node
@@ -101,12 +105,19 @@ class MCTS_Node:
         while not simulated_game.game_over(): 
             # While the game is not over
 
-            # Flip between Players
-            current_turn = 1 if current_turn == 2 or current_level < 2 else 2 
+            if self._modified_rules and (current_level == 2):
+                current_turn = 2
+            # Under normal rules, red places first cathedral then first piece
+            elif not self._modified_rules and (current_level == 1):
+                current_turn = 1
+            else:
+                current_turn = 1 if current_turn == 2 else 2
+
             current_player = simulated_game.red_player if current_turn == 1 else simulated_game.black_player
 
             # Get potential moves for the current player
-            potential_moves = simulated_game.get_potential_moves(current_player)
+            cathedral_turn = True if (self._modified_rules and current_level == 1) else None
+            potential_moves = simulated_game.get_potential_moves(current_player, cathedral_turn)
 
             # If the current player can make a move, if not flip to the other player/end the game
             if potential_moves: 
@@ -114,16 +125,12 @@ class MCTS_Node:
 
                 # Remove the piece from the players piece count
                 piece_selected = move_selected[0] 
-                if current_turn == 1:
-                    simulated_game.red_player.use_piece(piece_selected)
-                else: 
-                    simulated_game.black_player.use_piece(piece_selected)
+                simulated_game.use_piece(current_turn, piece_selected)
 
                 # Update the board
                 returned_pieces = simulated_game.game_board.update(move_selected[1], current_turn, move_selected[0])
                 if returned_pieces:  # If any pieces were captured, return them to the opposing player
-                    if current_turn == 1: simulated_game.black_player.return_pieces(returned_pieces[0])
-                    else: simulated_game.red_player.return_pieces(returned_pieces[0])
+                    simulated_game.return_piece(current_turn, returned_pieces[0])
         
             # Go to the next 'level' (next order of potential moves)
             current_level+=1
@@ -238,7 +245,8 @@ class MCTS_Node:
             node = self._tree_policy(C)  # Either a new node or the best child
             reward = node._rollout()  # Simulate a game from this node
             node._backpropagate(reward)  # Backprop results of sim
-    
+
+        #self.best_child(C)._game.game_board.print_board()
         return self.best_child(C)   
     
     def find_node(self, game_state):

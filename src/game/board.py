@@ -229,7 +229,7 @@ class Board:
                 if legal_move: return True
         return False
     
-    def find_all_legal_moves(self, player, piece_counts, has_cathedral, first_turn=None):
+    def find_all_legal_moves(self, player, piece_counts, has_cathedral, cathedral_turn):
         """
         Creates a list of all legal moves for the given player
 
@@ -240,7 +240,7 @@ class Board:
         """
 
         legal_moves = []
-        if first_turn:
+        if cathedral_turn:
             legal_move = self.find_potential_moves_for_given_piece('c', player)
             for move in legal_move:
                 legal_moves.append(('c', move))
@@ -323,7 +323,7 @@ class Player:
     """
     Handles each player (red/black)
     """
-    def __init__(self, player_num):
+    def __init__(self, player_num, modified_rules=None):
         """
         player_num :
         pieces : gets all player pieces
@@ -334,7 +334,12 @@ class Player:
         self.player_num = player_num
         self.pieces = p.red_pieces if player_num == 1 else p.black_pieces
         self.score = 47  # Starting score is sum of all pieces, goal is to place all pieces or get lowest score before game ends
-        self.has_cathedral = True if player_num == 1 else False
+        if modified_rules and player_num == 2:
+            self.has_cathedral = True
+        elif not modified_rules and player_num == 1:
+            self.has_cathedral = True
+        else:
+            self.has_cathedral = False
     
     def use_piece(self, piece):
         """
