@@ -246,22 +246,29 @@ class MCTS_Node:
             reward = node._rollout()  # Simulate a game from this node
             node._backpropagate(reward)  # Backprop results of sim
 
-        #self.best_child(C)._game.game_board.print_board()
         return self.best_child(C)   
     
     def find_node(self, game_state):
+        if self.check_equivelence(game_state):
+            return self
         for child in self._children:
-            if child._game == game_state:
+            if child.check_equivelence(game_state):
                 return child
         return False
     
-    def expand_specific_node(self, game_state):
+    def expand_specific_node(self, game_state, modified_rules=None):
         """
         Used when a game is being played and the tree does
         not contain a child node for the opponents selected move
         """
-        new_node = MCTS_Node(game_state, self._next_turn, self._level+1, parent=self)
+        new_node = MCTS_Node(game_state, self._next_turn, self._level+1, parent=self, modified_rules=modified_rules)
         self._children.append(new_node)
         return new_node
     
+    def check_equivelence(self, game_state):
+        #print(self._game.game_board.board_to_array(), game_state.game_board.board_to_array())
+        if (self._game.game_board.board_to_array() == game_state.game_board.board_to_array()):
+            return True
+        else:
+            return False
     

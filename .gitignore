@@ -1,3 +1,5 @@
 __pycache__
 src/game/results
 src/game/trees
+src/game/sims
+src/game/run_sims.sh

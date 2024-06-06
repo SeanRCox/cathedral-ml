@@ -229,7 +229,7 @@ class Board:
                 if legal_move: return True
         return False
     
-    def find_all_legal_moves(self, player, piece_counts, has_cathedral, cathedral_turn):
+    def find_all_legal_moves(self, player, piece_counts, has_cathedral, cathedral_turn=None):
         """
         Creates a list of all legal moves for the given player
 
@@ -318,6 +318,10 @@ class Board:
             if valid: valid_placements.append(coordinates_to_update)  # If all of the squares are valid, add it to the list of valid placements
 
         return valid_placements
+    
+    def board_to_array(self):
+        return self._board.flatten().tolist()
+
 
 class Player:
     """
