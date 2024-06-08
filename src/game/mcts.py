@@ -272,3 +272,8 @@ class MCTS_Node:
         else:
             return False
     
+    def go_back_to_root(self):        
+        if self._parent != None:
+            self._parent.go_back_to_root()  # Backprop
+        else:
+            return self

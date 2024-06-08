@@ -51,10 +51,10 @@ def create_trees():
 
     return True
 
-def sim_game(p1, p2, p1_C=None, p2_C=None, p1_sims=None, p2_sims=None, modified_rules=None):
+def sim_game(p1, p2, modified_rules=None):
     sim = Game()
-    p1_type = 'Tree' if isinstance(p1, MCTS_Node) else 'Random'
-    p2_type = 'Tree' if isinstance(p2, MCTS_Node) else 'Random'
+    p1_type = 'Tree' if isinstance(p1.tree, MCTS_Node) else 'Random'
+    p2_type = 'Tree' if isinstance(p2.tree, MCTS_Node) else 'Random'
 
     turn = 1
     level = 0
@@ -74,7 +74,7 @@ def sim_game(p1, p2, p1_C=None, p2_C=None, p1_sims=None, p2_sims=None, modified_
         if potential_moves: 
             if turn == 1:
                 if p1_type == 'Tree':
-                    sim = copy.deepcopy(p1.best_action(p1_sims, p1_C)._game)
+                    sim = copy.deepcopy(p1.tree.best_action(p1.sims_per_turn, p1.C)._game)
 
                 elif p1_type == 'Random':
                     move_selected = random.choice(potential_moves)  # choice a random move to make
@@ -88,7 +88,7 @@ def sim_game(p1, p2, p1_C=None, p2_C=None, p1_sims=None, p2_sims=None, modified_
 
             elif turn == 2:
                 if p2_type == 'Tree':
-                    sim = copy.deepcopy(p2.best_action(p2_sims, p2_C)._game)
+                    sim = copy.deepcopy(p2.tree.best_action(p2.sims_per_turn, p2.C)._game)
 
                 elif p2_type == 'Random':
                     move_selected = random.choice(potential_moves)  # choice a random move to make
@@ -101,18 +101,18 @@ def sim_game(p1, p2, p1_C=None, p2_C=None, p1_sims=None, p2_sims=None, modified_
                        sim.return_piece(turn, returned_pieces[0])
 
         if p1_type == 'Tree':
-            next_node = p1.find_node(sim)
+            next_node = p1.tree.find_node(sim)
             if next_node:
-                p1 = next_node
+                p1.tree = next_node
             else:
-                p1 = p1.expand_specific_node(copy.deepcopy(sim), modified_rules=modified_rules)
+                p1.tree = p1.tree.expand_specific_node(copy.deepcopy(sim), modified_rules=modified_rules)
 
         if p2_type == 'Tree':
-            next_node = p2.find_node(sim)
+            next_node = p2.tree.find_node(sim)
             if next_node:
-                p2 = next_node
+                p2.tree = next_node
             else: 
-                p2 = p2.expand_specific_node(copy.deepcopy(sim), modified_rules=modified_rules)
+                p2.tree = p2.tree.expand_specific_node(copy.deepcopy(sim), modified_rules=modified_rules)
 
         # Go to the next 'level' (next order of potential moves)
         level+=1
@@ -126,7 +126,6 @@ def sim_game(p1, p2, p1_C=None, p2_C=None, p1_sims=None, p2_sims=None, modified_
             turn = 1 if turn == 2 else 2
 
     return sim.winner  # Once a winner is found, end simulation
-
 
 def simulate_games(num_games, p1, p2, p1_C=None, p2_C=None, p1_sims=None, p2_sims=None, modified_rules=None):
     """
@@ -162,6 +161,7 @@ def simulate_games(num_games, p1, p2, p1_C=None, p2_C=None, p1_sims=None, p2_sim
         f.write(f"\n"*2)
         f.close()
 
+
 def get_trees():
     """
     Load trees from the trees file
@@ -178,10 +178,3 @@ def get_trees():
                 trees.append(pickle.load(f))
 
     return trees
-
-trees = []
-trees.append(tree_expansion(num_games=1, C=0.5))
-#trees.append(tree_expansion(num_games=1000, C=0.5, modified_rules=True))
-
-simulate_games(100, trees[0], trees[0], p1_C=0.5, p1_sims=10, p2_C=0.5, p2_sims=10)
-

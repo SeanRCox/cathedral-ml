@@ -1,6 +1,8 @@
 import numpy as np
 import pieces as p
 
+import copy
+
 class Board: 
     """
     Manages the Board - places pieces, refreshes the board state, etc
@@ -336,7 +338,7 @@ class Player:
         """
 
         self.player_num = player_num
-        self.pieces = p.red_pieces if player_num == 1 else p.black_pieces
+        self.pieces = copy.deepcopy(p.red_pieces) if player_num == 1 else copy.deepcopy(p.black_pieces)
         self.score = 47  # Starting score is sum of all pieces, goal is to place all pieces or get lowest score before game ends
         if modified_rules and player_num == 2:
             self.has_cathedral = True
