@@ -216,6 +216,13 @@ def main():
     simulate_games(50, tree_high_modified, random_player_black, modified_rules=True)
     simulate_games(50, random_player_red, tree_high_modified, modified_rules=True)
 
+    trees = [random_player_red, random_player_black, tree_low_normal, tree_medium_normal, tree_high_normal,
+             tree_low_modified, tree_medium_modified, tree_high_modified]
+
+    f = open('final_elos.txt', "a")
+    for tree in trees:
+        f.write(f"{tree} elo: {tree.elo}")
+        f.write(f"\n")
 
 if __name__=="__main__": 
     main() 
