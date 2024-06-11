@@ -1,3 +1,7 @@
+"""
+Simulates games of Cathedral
+"""
+
 import random
 import json
 import datetime
@@ -7,7 +11,17 @@ import math
 from game import Game
 from mcts import MCTS_Node
 
+
 class Tree:
+    """
+    Object to manage the game tree
+
+    num_games : number of games (new nodes) to precompute the tree with
+    C : exploration paramter
+    n_expansion_per_turn : number of new nodes to simulate per tree turn
+    modified_rules : optional arg to specify if tree should be using modified ruleset
+    """
+
     def __init__(self, num_games, C, n_expansion_per_turn, modified_rules=None):
         self.root = tree_expansion(num_games, C, modified_rules=modified_rules)
         self.tree = self.root
@@ -16,21 +30,30 @@ class Tree:
         self.sims_per_turn = n_expansion_per_turn
         self.modified_rules = modified_rules
 
+
 class Random_Player:
+    """
+    Object to manage a 'random' player (a player who only makes random moves)
+    """
+
     def __init__(self):
         self.root = None
         self.tree = None
         self.elo = 1000
 
+
 def simulate_games(games_to_sim, p1, p2, modified_rules=None):
     """
     Simulate n games for all input trees using given C
-    writes all results to a file 
 
-    trees : a list of all trees
-    C : hyperparameter for explotation vs exploration
-    num_games : number of games to simulate
+    p1 : the red player, either a tree or a random player
+    p2 : the black player, either a tree or a random player
+    modified_rules : optional arg to specify if tree should be using modified ruleset
+
+    return -> None, writes results dict to a file
     """
+
+    # results dict
     results = {}
     results[1] = 0
     results[-1] = 0
@@ -62,15 +85,33 @@ def simulate_games(games_to_sim, p1, p2, modified_rules=None):
     f.close()
 
 def elo_calulation(elo_a, elo_b):
+    """
+    Helper function used to calculate elo
+
+    elo_a : first elo 
+    elo _b : second elo
+
+    return -> probability of victory for first elo input
+    """
      
     return 1.0 * 1.0 / (1 + 1.0 * math.pow(10, 1.0 * (elo_a - elo_b) / 400))
  
 def elo(elo_1, elo_2, k, winner):
+    """
+    Function used to calculate elo
+
+    elo_1 : p1 elo
+    elo_2 : p2 elo
+    k : rating change constant (here, set to 20)
+    winner : the winning player
+
+    return -> the new elos of p1 and p2
+    """
  
-    # Probability of Player 1 winning
+    # Probability of p1 winning
     prob_1 = elo_calulation(elo_2, elo_1)
 
-    # Probability of Player 2 winning
+    # Probability of p2 winning
     prob_2 = elo_calulation(elo_1, elo_2)
  
     if winner == 1:
@@ -93,6 +134,8 @@ def tree_expansion(num_games, C, modified_rules=None):
 
     num_games : the number of games the tree should be pre-computed with
     C : hyperparameter for exploitation vs exploration
+
+    return -> the root of the tree
     """
 
     # Intialize the blank node and game
@@ -104,6 +147,15 @@ def tree_expansion(num_games, C, modified_rules=None):
     return root
 
 def sim_game(p1, p2, modified_rules=None):
+    """
+    Simulate a game between two players
+
+    p1 : the red player, either a tree or a random player
+    p2 : the black player, either a tree or a random player
+    modified_rules : optional arg to specify if tree should be using modified ruleset
+    
+    return -> the winner of the game
+    """
     sim = Game()
     p1_type = 'Tree' if isinstance(p1.tree, MCTS_Node) else 'Random'
     p2_type = 'Tree' if isinstance(p2.tree, MCTS_Node) else 'Random'
@@ -123,10 +175,12 @@ def sim_game(p1, p2, modified_rules=None):
         if potential_moves: 
             if turn == 1:
                 if p1_type == 'Tree':
+                    # Update sim to be a copy of the tree's next best action 
+                    # This is equivelent to making a move for the tree player
                     sim = copy.deepcopy(p1.tree.best_action(p1.sims_per_turn, p1.C)._game)
 
                 elif p1_type == 'Random':
-                    move_selected = random.choice(potential_moves)  # choice a random move to make
+                    move_selected = random.choice(potential_moves)  # choose a random move to make
                     piece_selected = move_selected[0] 
                     sim.use_piece(turn, piece_selected) 
 
@@ -137,6 +191,8 @@ def sim_game(p1, p2, modified_rules=None):
 
             elif turn == 2:
                 if p2_type == 'Tree':
+                    # Update sim to be a copy of the tree's next best action 
+                    # This is equivelent to making a move for the tree player
                     sim = copy.deepcopy(p2.tree.best_action(p2.sims_per_turn, p2.C)._game)
 
                 elif p2_type == 'Random':
@@ -149,18 +205,23 @@ def sim_game(p1, p2, modified_rules=None):
                     if returned_pieces:
                        sim.return_piece(turn, returned_pieces[0])
 
+        # Trees need to be set to the new game state once the other player makes a move
         if p1_type == 'Tree':
+            # Try to find the new game state in the game tree
             next_node = p1.tree.find_node(sim)
             if next_node:
                 p1.tree = next_node
             else:
+                # If the game state isn't in the game tree, expand the game tree so that it is
                 p1.tree = p1.tree.expand_specific_node(copy.deepcopy(sim), modified_rules=modified_rules)
 
         if p2_type == 'Tree':
+            # Try to find the new game state in the game tree
             next_node = p2.tree.find_node(sim)
             if next_node:
                 p2.tree = next_node
             else: 
+                # If the game state isn't in the game tree, expand the game tree so that it is
                 p2.tree = p2.tree.expand_specific_node(copy.deepcopy(sim), modified_rules=modified_rules)
 
         # Go to the next 'level' (next order of potential moves)
@@ -177,52 +238,11 @@ def sim_game(p1, p2, modified_rules=None):
     return sim.winner  # Once a winner is found, end simulation
 
 def main(): 
-    # Low -> C = 0.7
-    # Medium -> C = sqrt(2) (Theoretical ideal value)
-    # High -> C = 2.1 
+    """
+    
+    Simulate Games Here
 
-    random_player_red = Random_Player()
-    random_player_black = Random_Player()
-
-    # Trees with normal Rules
-    tree_low_normal = Tree(num_games=2500, C=0.7, n_expansion_per_turn=25)
-    tree_medium_normal = Tree(num_games=2500, C=math.sqrt(2), n_expansion_per_turn=25)
-    tree_high_normal = Tree(num_games=2500, C=2.1, n_expansion_per_turn=25)
-
-    # Trees with modified rules
-    tree_low_modified = Tree(num_games=2500, C=0.7, n_expansion_per_turn=25, modified_rules=True)
-    tree_medium_modified = Tree(num_games=2500, C=math.sqrt(2), n_expansion_per_turn=25, modified_rules=True)
-    tree_high_modified = Tree(num_games=2500, C=2.1, n_expansion_per_turn=25, modified_rules=True)
-
-    # Control Group 
-    simulate_games(100, random_player_red, random_player_black)  # Sim 1
-    simulate_games(100, random_player_red, random_player_black, modified_rules=True)  # Sim 2
-
-    simulate_games(50, tree_low_normal, random_player_black)
-    simulate_games(50, random_player_red, tree_low_normal)
-
-    simulate_games(50, tree_medium_normal, random_player_black)
-    simulate_games(50, random_player_red, tree_medium_normal)
-
-    simulate_games(50, tree_high_normal, random_player_black)
-    simulate_games(50, random_player_red, tree_high_normal)
-
-    simulate_games(50, tree_low_modified, random_player_black, modified_rules=True)
-    simulate_games(50, random_player_red, tree_low_modified, modified_rules=True)
-
-    simulate_games(50, tree_medium_modified, random_player_black, modified_rules=True)
-    simulate_games(50, random_player_red, tree_medium_modified, modified_rules=True)
-
-    simulate_games(50, tree_high_modified, random_player_black, modified_rules=True)
-    simulate_games(50, random_player_red, tree_high_modified, modified_rules=True)
-
-    trees = [random_player_red, random_player_black, tree_low_normal, tree_medium_normal, tree_high_normal,
-             tree_low_modified, tree_medium_modified, tree_high_modified]
-
-    f = open('final_elos.txt', "a")
-    for tree in trees:
-        f.write(f"{tree} elo: {tree.elo}")
-        f.write(f"\n")
+    """
 
 if __name__=="__main__": 
     main() 

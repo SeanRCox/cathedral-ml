@@ -1,7 +1,10 @@
-import numpy as np
-import pieces as p
+"""
+Handles the game board, players and piece objects
+"""
 
 import copy
+import numpy as np
+
 
 class Board: 
     """
@@ -22,19 +25,11 @@ class Board:
         _board_dimensions : the dimensions of the board, in this case 10x10
         _total_squares : the total number of squares on the board
         _board : the board
-
-        _p1_controlled : number of squares controlled by player 1
-        _p2_controlled : number of squares controlled by player 2
         """
 
         self._board_dimensions = 10
         self._total_squares = self._board_dimensions * self._board_dimensions
         self._board = np.zeros([self._board_dimensions, self._board_dimensions], dtype=object)
-        
-        self._p1_controlled = 0
-        self._p2_controlled = 0 
-
-        self.total_placed_pieces = 0
 
     def _refresh_board_state(self, placed_piece, player_sign):
         """
@@ -71,9 +66,6 @@ class Board:
                         captured_squares = self._check_if_surrounded(player_sign*-1, adj_x, adj_y)  # Check if the square is surrounded by the opposing player
                         if captured_squares:  # If the square is surrounded by the opposing player
                             captured_pieces = []
-                            
-                            if player_sign == 1: self._p1_controlled += len(captured_squares)  # Update the amount of captured squares, used to check if squares are surrounded
-                            else: self._p2_controlled += len(captured_squares) 
 
                             controlled_by = 'r' if player_sign == 1 else 'b'  # Determine which symbol to place based on which player will now control the squares
                             for c_sq in captured_squares:
@@ -88,14 +80,14 @@ class Board:
         
         return False  # Returns False if no pieces are captured 
         
-    def _get_adjacent_squares(self, x,y):
+    def _get_adjacent_squares(self, x, y):
         """
         Gets all adjacent squares
 
-        param x : x coordinate to be checked around
-        param y : y coordinate to be checked around
+        x : x coordinate to be checked around
+        y : y coordinate to be checked around
 
-        return : all adjacent squares in every direction (including diagonals)
+        return -> all adjacent squares in every direction (including diagonals)
         """
 
         adj_squares = []
@@ -111,11 +103,11 @@ class Board:
         """
         Checks if a given square is surronded by the opposing player
 
-        param player_sign : positive/negative numbers associated with each players pieces (1 for p1 or -1 for p2)
-        param x : x coordinate to be checked
-        param y : y coordinate to be checked
+        player_sign : positive/negative numbers associated with each players pieces (1 for p1 or -1 for p2)
+        x : x coordinate to be checked
+        y : y coordinate to be checked
 
-        return : either False (not surrounded) or a list of the surrounded squares
+        return -> either False (not surrounded) or a list of the surrounded squares
         """
 
         piece_type_seen = []  # Record each type of piece seen (More then 1 cannot be captured)
@@ -131,14 +123,6 @@ class Board:
 
             if len(piece_type_seen) > 1:
                 return False  # Only 1 piece can be surrounded and captured. If there is more then 1 type of piece in an area, the area is uncapturable.
-
-            """
-            opponent_control_count = self._p2_controlled if player_sign == 1 else self._p1_controlled  # number of squares controlled by opponent (unreachable)
-            if len(visited) > self._total_squares/2 - opponent_control_count: 
-                # If an area is able to be reached by half the reachable board, it cannot be captured
-                # This logic ensures only small areas can be captured
-                return False
-            """
             
             for sq in self._get_adjacent_squares(x,y): # Check every adjacent square to the given square
                 nx, ny = sq[0], sq[1]
@@ -164,16 +148,32 @@ class Board:
                     queue.append((nx, ny))
 
         return visited
+    
+    def _check_if_legal_move(self, target_squares, player):
+        """
+        Checks if a proposed move is legal
+
+        target_squares : squares to updated
+        player : the player number (1 or 2)
+
+        return -> True if legal, otherwise False
+        """
+
+        valid_squares = 'r' if player == 1 else 'b'
+        for target in target_squares:
+            if self._board[target[0], target[1]] != 0 and self._board[target[0], target[1]] != valid_squares:
+                return False
+        return True
 
     def update(self, target_squares, player, piece_num):
         """
         Used to place pieces on the board, subsequently updates the board state
 
-        param target_squares : squares to updated
-        param player : the player number (1 or 2)
-        param piece_num : the piece number (1-10)
+        target_squares : squares to updated
+        player : the player number (1 or 2)
+        piece_num : the piece number (1-10)
 
-        return : any pieces that have been captured
+        return -> any pieces that have been captured
         """
         self.total_placed_pieces += 1
         player_sign = 1 if player == 1 else -1
@@ -186,22 +186,6 @@ class Board:
             if self.total_placed_pieces <= 3:  # Squares can only be captured after each players first turn
                 return False
             return self._refresh_board_state(target_squares, player_sign)  # If any pieces are captured, return them to the player
-
-    def _check_if_legal_move(self, target_squares, player):
-        """
-        Checks if a proposed move is legal
-
-        param target_squares : squares to updated
-        param player : the player number (1 or 2)
-
-        return : True if legal, otherwise False
-        """
-
-        valid_squares = 'r' if player == 1 else 'b'
-        for target in target_squares:
-            if self._board[target[0], target[1]] != 0 and self._board[target[0], target[1]] != valid_squares:
-                return False
-        return True
     
     def print_board(self):
         """
@@ -217,9 +201,11 @@ class Board:
         """
         Finds if there are any legal moves for the given player
 
-        param player : the player number (1 or 2)
+        player : the player number (1 or 2)
+        piece_counts :
+        has_cathedral :
         
-        return : True if a legal move is found, otherwise False
+        return -> True if a legal move is found, otherwise False
         """
 
         legal_moves = []
@@ -235,10 +221,12 @@ class Board:
         """
         Creates a list of all legal moves for the given player
 
-        param player : the player number (1 or 2)
-        param piece_counts : list of piece counts for that player (needs to be atleast 1 to be able to place the piece)
+        player : the player number (1 or 2)
+        piece_counts : list of piece counts for that player (needs to be atleast 1 to be able to place the piece)
+        has_cathedral : boolean, true if player has cathedral, otherwise false
+        cathedral_turn : boolean, true if it is the cathedral turn (special turn) otherwise false
         
-        return : a list of all legal moves for each piece for the given player
+        return -> a list of all legal moves for each piece for the given player
         """
 
         legal_moves = []
@@ -263,15 +251,15 @@ class Board:
         """
         Creates a list of all potential moves for each piece (considering all shapes)
 
-        param player : the player number (1 or 2)
-        param piece_number : the piece number (1-11)
+        player : the player number (1 or 2)
+        piece_number : the piece number (1-11)
         
-        return : all potential moves for a given piece
+        return -> all potential moves for a given piece
         """
 
-        pieces = p.red_pieces if player == 1 else p.black_pieces
+        pieces = get_pieces(1) if player == 1 else get_pieces(2)
         if piece_number == 'c':
-            rotations = p.cathedral[2]
+            rotations = get_pieces('c')[2]
         else:
             rotations = pieces[int(piece_number)-1][2] # Get all possible rotations of the given piece
         
@@ -282,17 +270,16 @@ class Board:
                 # For each shape, get all of the potential moves and add it to the list
                 potential_moves.append(move)
 
-        #print("Potential Moves for piece #:" + str(piece_number) + str(potential_moves))
         return potential_moves
             
     def find_potential_moves_for_given_shape(self, piece_shape, player):
         """
         Scans the board to final all potential moves for a given piece shape
 
-        param piece_shape : the shape to checked for
-        param player : the player number (1 or 2)
+        piece_shape : the shape to checked for
+        player : the player number (1 or 2)
 
-        return : a list of all valid placements of that shape
+        return -> a list of all valid placements of that shape
         """
 
         potential_placements = []  # All potential spots on the board that fit the given shape
@@ -329,16 +316,19 @@ class Player:
     """
     Handles each player (red/black)
     """
+
     def __init__(self, player_num, modified_rules=None):
         """
-        player_num :
+        player_num : 1 for red, 2 for black
+        modified_rules : optional arg to specify if tree should be using modified ruleset
+        
         pieces : gets all player pieces
         score : the player score (lower score is better)
-        has_cathedral : T/F, if player has cathedral or not
+        has_cathedral : boolean, if player has cathedral or not
         """
 
         self.player_num = player_num
-        self.pieces = copy.deepcopy(p.red_pieces) if player_num == 1 else copy.deepcopy(p.black_pieces)
+        self.pieces = copy.deepcopy(get_pieces(1))if player_num == 1 else copy.deepcopy(get_pieces(2))
         self.score = 47  # Starting score is sum of all pieces, goal is to place all pieces or get lowest score before game ends
         if modified_rules and player_num == 2:
             self.has_cathedral = True
@@ -352,6 +342,8 @@ class Player:
         Remove a piece from a players piece count, update their score
 
         piece : piece to remove
+
+        return -> True if piece is used
         """
 
         # If piece is the cathedral, set cathedral boolean to false
@@ -371,6 +363,8 @@ class Player:
     def get_piece_counts(self):
         """
         Returns a list of the current players piece count
+
+        return -> list of the current players piece count
         """
 
         counts = []
@@ -384,6 +378,8 @@ class Player:
         Increments a players piece count if a piece is captured by the other player
 
         piece : the piece to be returned
+
+        return -> None
         """
 
         if piece == 'c':
@@ -395,10 +391,156 @@ class Player:
     def can_place_cathedral(self):
         """
         Returns whether or not the current player can place the cathedral
+
+        return -> boolean
         """
 
         return self.has_cathedral
-
     
+
+class Piece:
+    """
+    Creates the board pieces
+    """
+
+    def __init__(self, p_num, p_value, p_count, p_shape, player):
+        """
+        p_value : value of the piece
+        p_num : number (1-9) that identifies the piece on the board
+        p_count : amount of that piece the player starts with
+        p_shape : 2d array of the pieces base shape
+        player :  player number (1/-1)
+        rotations: all of the possible rotations for that piece (between 1 and 4)
+        """
+        
+        self._point_value = p_value
+        self._piece_shape = np.where(p_shape == 1, p_num*player, p_shape)
+        self._initial_count = p_count
+        self._rotations = []
+        self._rotations.append(self._piece_shape)
+
+        # Get all potential rotations
+        _potential_rotations = []
+        _potential_rotations.append(self._rotate_clockwise())
+        _potential_rotations.append(self._rotate_180())
+        _potential_rotations.append(self._rotate_counterclockwise())
+        
+        # Remove any duplicate rotations
+        seen = set()
+        unique_rotations = []
+        for rotation in _potential_rotations:
+            # Use a tuple representation to hash the array for checking duplicates
+            rotation_tuple = tuple(map(tuple, rotation))
+            if rotation_tuple not in seen:
+                seen.add(rotation_tuple)
+                unique_rotations.append(rotation)
+
+        # Add all unique shapes to the rotations list
+        for shape in unique_rotations:
+            if not np.array_equal(shape, self._piece_shape):
+                self._rotations.append(shape)
+
+    def _rotate_clockwise(self):
+        """ 
+        Rotate the matrix clockwise 90 degrees. 
+
+        return -> rotated matrix
+        """
+
+        return np.array([list(reversed(col)) for col in zip(*self._piece_shape)])
+    
+    def _rotate_180(self):
+        """ 
+        Rotate the matrix 180 degrees. 
+
+        return -> rotated matrix
+        """
+
+        return np.array([list(reversed(row)) for row in reversed(self._piece_shape)])
+
+    def _rotate_counterclockwise(self):
+        """ 
+        Rotate the matrix counterclockwise 90 degrees. 
+
+        return -> rotated matrix
+        """
+
+        return np.array([list(col) for col in reversed(list(zip(*self._piece_shape)))])
+    
+    def get_piece(self):
+        """
+        Returns the specified piece's values
+
+        return -> point value, count, all rotations
+        """
+        return [self._point_value, self._initial_count, self._rotations]
+
+
+def get_pieces(type):
+    """
+    Returns the appropriate piece objects
+
+    type : 1 for red, 2 for black, c for cathedral
+    
+    return -> red pieces/black pieces, or cathedral
+    """
+    # Piece Information
+
+    # Default piece shapes
+    tavern_shape = np.array([[1]])
+
+    stable_shape = np.array([[1, 1]])
+
+    inn_shape = np.array([[1, 1],
+                        [1, 0]])
+    
+    bridge_shape = np.array([[1, 1, 1]])
+    manor_shape = np.array([[1, 1, 1],
+                        [0, 1, 0]])
+    
+    square_shape = np.array([[1, 1],
+                            [1, 1]])
+    
+    abbey_shape = np.array([[1, 1, 0],
+                        [0, 1, 1]])
+    
+    infirmary_shape = np.array([[0, 1, 0],
+                            [1, 1, 1],
+                            [0, 1, 0]])
+    
+    castle_shape = np.array([[1, 1],
+                    [1, 0],
+                    [1, 1]])
+    
+    tower_shape = np.array([[0, 0, 1],
+                        [0, 1, 1],
+                        [1, 1, 0]])
+    
+    academy_shape = np.array([[0, 1, 0],
+                            [0, 1, 1],
+                            [1, 1, 0]])
+    
+    cathedral_shape = np.array([[0, 1, 0],
+                            [1, 1, 1],
+                            [0, 1, 0],
+                            [0, 1, 0]])
+
+    piece_shapes = [tavern_shape, stable_shape, inn_shape, bridge_shape, manor_shape, square_shape, 
+                abbey_shape, infirmary_shape, castle_shape, tower_shape, academy_shape]
+
+    # Piece number, piece value, inital piece count
+    piece_values = [(1, 1, 2), (2, 2, 2), (3, 3, 2), (4, 3, 1), (5, 4, 1), (6, 4, 1),
+                (7, 4, 1), (8, 5, 1), (9, 5, 1), (10, 5, 1), (11, 5, 1)] 
+
+    # Return requested piece set
+    if type == 1: 
+        # Red Pieces
+        return [(Piece(piece_values[i][0], piece_values[i][1], piece_values[i][2], shape, 1).get_piece()) for i, shape in enumerate(piece_shapes)]
+    elif type == 2:
+        # Red Pieces
+        return [(Piece(piece_values[i][0], piece_values[i][1], piece_values[i][2], shape, -1).get_piece()) for i, shape in enumerate(piece_shapes)]
+    elif type == 'c':
+        # Cathedral
+        return (Piece('c', 0, 1, cathedral_shape, 1).get_piece())
 
 
